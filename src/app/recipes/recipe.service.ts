@@ -6,7 +6,7 @@ import { Recipe } from './recipe.model';
 
 @Injectable()
 export class RecipeService {
-  recipe: Recipe[] = [
+  recipes: Recipe[] = [
     new Recipe(
       'A task recipe',
       'description',
@@ -25,10 +25,14 @@ export class RecipeService {
   constructor(private slService: ShoppingListService) {}
 
   getRecipes() {
-    return this.recipe.slice();
+    return this.recipes.slice();
   }
 
   addIngredientToShoppingList(ingredients: Ingredient[]) {
     this.slService.addIngredients(ingredients);
+  }
+
+  getRecipe(index: number) {
+    return this.recipes[index];
   }
 }
