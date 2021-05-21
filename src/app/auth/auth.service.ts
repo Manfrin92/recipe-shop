@@ -1,9 +1,10 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError } from 'rxjs/operators';
-import { throwError } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
+import { Subject, throwError } from 'rxjs';
+import { User } from './user.model';
 
-interface AuthResponseData {
+export interface AuthResponseData {
   kind: string;
   idToken: string;
   email: string;
@@ -12,10 +13,16 @@ interface AuthResponseData {
   localId: string;
 }
 
+export interface AuthLoginResponseData extends AuthResponseData {
+  registered: boolean;
+}
+
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
+  user = new Subject<User>();
+
   constructor(private httpClient: HttpClient) {}
 
   signUp(email: string, password: string) {
@@ -29,28 +36,72 @@ export class AuthService {
         }
       )
       .pipe(
-        catchError((errorResp) => {
-          let errorMessage = 'An unknown error occurred.';
-
-          if (!errorResp.error || !errorResp.error.error) {
-            return throwError(errorMessage);
-          } else {
-            switch (errorResp.error.error.message) {
-              case 'EMAIL_EXISTS':
-                errorMessage = 'This email already exists';
-                break;
-              default:
-            }
-            return throwError(errorMessage);
-          }
+        catchError(this.handleError),
+        tap((respData) => {
+          this.handleAuthentication(
+            respData.email,
+            respData.idToken,
+            Number(respData.expiresIn),
+            respData.localId
+          );
         })
       );
   }
 
   login(email: string, password: string) {
-    this.httpClient.post(
-      'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyCh_ndgM6DRWrkBswfCYs96I8k1h4lmzk0',
-      {}
-    );
+    return this.httpClient
+      .post<AuthLoginResponseData>(
+        'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyCh_ndgM6DRWrkBswfCYs96I8k1h4lmzk0',
+        {
+          email,
+          password,
+          returnSecureToken: true,
+        }
+      )
+      .pipe(
+        catchError(this.handleError),
+        tap((respData) => {
+          this.handleAuthentication(
+            respData.email,
+            respData.idToken,
+            Number(respData.expiresIn),
+            respData.localId
+          );
+        })
+      );
+  }
+
+  private handleError(errorRes: HttpErrorResponse) {
+    let errorMessage = 'An unknown error occurred.';
+
+    if (!errorRes.error || !errorRes.error.error) {
+      return throwError(errorMessage);
+    } else {
+      switch (errorRes.error.error.message) {
+        case 'EMAIL_EXISTS':
+          errorMessage = 'This email already exists';
+          break;
+        case 'EMAIL_NOT_FOUND':
+          errorMessage = 'This email does not exists';
+          break;
+        case 'INVALID_PASSWORD':
+          errorMessage = 'Invalid entered password';
+          break;
+      }
+      return throwError(errorMessage);
+    }
+  }
+
+  private handleAuthentication(
+    email: string,
+    token: string,
+    expiresIn: number,
+    userId: string
+  ) {
+    const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
+
+    const user = new User(email, userId, token, expirationDate);
+
+    this.user.next(user);
   }
 }
