@@ -1,5 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { catchError } from 'rxjs/operators';
+import { throwError } from 'rxjs';
 
 interface AuthResponseData {
   kind: string;
@@ -17,13 +19,38 @@ export class AuthService {
   constructor(private httpClient: HttpClient) {}
 
   signUp(email: string, password: string) {
-    return this.httpClient.post<AuthResponseData>(
-      'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyCh_ndgM6DRWrkBswfCYs96I8k1h4lmzk0',
-      {
-        email,
-        password,
-        returnSecureToken: true,
-      }
+    return this.httpClient
+      .post<AuthResponseData>(
+        'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyCh_ndgM6DRWrkBswfCYs96I8k1h4lmzk0',
+        {
+          email,
+          password,
+          returnSecureToken: true,
+        }
+      )
+      .pipe(
+        catchError((errorResp) => {
+          let errorMessage = 'An unknown error occurred.';
+
+          if (!errorResp.error || !errorResp.error.error) {
+            return throwError(errorMessage);
+          } else {
+            switch (errorResp.error.error.message) {
+              case 'EMAIL_EXISTS':
+                errorMessage = 'This email already exists';
+                break;
+              default:
+            }
+            return throwError(errorMessage);
+          }
+        })
+      );
+  }
+
+  login(email: string, password: string) {
+    this.httpClient.post(
+      'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyCh_ndgM6DRWrkBswfCYs96I8k1h4lmzk0',
+      {}
     );
   }
 }

@@ -36,9 +36,8 @@ export class AuthComponent {
           this.isLoading = false;
         },
         (error) => {
-          console.log('signp error: ', error);
           this.isLoading = false;
-          this.error = 'An error occurred!';
+          this.error = error;
         }
       );
     }
